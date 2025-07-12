@@ -2,6 +2,7 @@
 #define TERMINAL_TABLE_H
 
 #include <algorithm>
+#include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -20,14 +21,14 @@ const std::string WHITE = "\x1b[37m";
 
 /**
  * 计算表格各列的最大宽度
- * 
+ *
  * @param headers 表头字符串向量
  * @param rows 二维字符串向量，表示表格数据行
  * @return 包含每列最大宽度的size_t向量
  */
 inline std::vector<size_t>
-calc_col_widths(const std::vector<std::string> &headers,
-                const std::vector<std::vector<std::string>> &rows) {
+calc_col_widths_by_row(const std::vector<std::string> &headers,
+                       const std::vector<std::vector<std::string>> &rows) {
   // 初始化宽度向量，初始值为表头长度
   std::vector<size_t> widths(headers.size(), 0);
   for (size_t i = 0; i < headers.size(); ++i) {
@@ -42,8 +43,30 @@ calc_col_widths(const std::vector<std::string> &headers,
 }
 
 /**
+ * 计算表格各列的最大宽度
+ *
+ * @param headers 表头字符串向量
+ * @param columns 二维字符串向量，表示表格数据列
+ * @return 包含每列最大宽度的size_t向量
+ */
+inline std::vector<size_t> calc_col_widths_by_column(
+    const std::vector<std::string> &headers,
+    const std::vector<std::vector<std::string>> &columns) {
+  std::vector<size_t> widths(headers.size(), 0);
+  for (size_t i = 0; i < headers.size(); ++i) {
+    auto &column = columns[i];
+    size_t curr_column_length = headers[i].length();
+    for (const auto &row : column) {
+      curr_column_length = std::max(curr_column_length, row.length());
+    }
+    widths[i] = curr_column_length;
+  }
+  return widths;
+}
+
+/**
  * 打印单行表格数据
- * 
+ *
  * @param row 字符串向量，表示一行数据
  * @param widths 每列宽度的size_t向量
  * @param colors 颜色代码字符串向量（可选，默认为空）
@@ -65,10 +88,9 @@ inline void print_row(const std::vector<std::string> &row,
   std::cout << std::endl;
 }
 
-
 /**
  * 打印带边框的标题
- * 
+ *
  * @param title 标题文本
  * @param title_length 标题区域总长度
  * @param color 颜色代码（可选，默认为空）
@@ -92,7 +114,7 @@ inline void print_title(const std::string &title, size_t title_length,
 
 /**
  * 打印表格分隔行
- * 
+ *
  * @param widths 每列宽度的size_t向量
  */
 inline void print_separator(const std::vector<size_t> &widths) {
@@ -106,7 +128,7 @@ inline void print_separator(const std::vector<size_t> &widths) {
 
 /**
  * 打印完整的表格
- * 
+ *
  * @param title 表格标题
  * @param headers 表头字符串向量
  * @param rows 二维字符串向量，表示表格数据行
@@ -120,8 +142,8 @@ inline void print_table_by_row(
     const std::string title_color = "",
     const std::vector<std::string> &header_colors = {},
     const std::vector<std::vector<std::string>> &row_colors = {}) {
-
-  auto widths = calc_col_widths(headers, rows);
+  if(rows.empty()) return;
+  auto widths = calc_col_widths_by_row(headers, rows);
   size_t title_length = 1; // 首个 '+'
   for (auto w : widths)
     title_length += w + 3; // 每列内容+左右空格+分隔符
@@ -139,6 +161,56 @@ inline void print_table_by_row(
   print_separator(widths);
 }
 
+inline void print_all_column(
+    const std::vector<std::vector<std::string>> &columns,
+    const std::vector<size_t> &widths,
+    const std::vector<std::vector<std::string>> &colors = {}) {
+    size_t row_num = columns[0].size();
+    size_t column_num = columns.size();
+    for(int i = 0; i < row_num; i++) {
+      std::cout << "|";
+      for(int j = 0; j < column_num; j++) {
+        if(j < colors.size() && i < colors[j].size()) {
+          std::cout << " " << colors[j][i] << std::left << std::setw(widths[j]) << columns[j][i] << RESET << " |";
+        } else {
+          std::cout << " " << std::left << std::setw(widths[j]) << columns[j][i] << " |";
+        }
+      }
+      std::cout << std::endl;
+    }
+}
+
+/**
+ * @brief 以列参数打印表格
+ * 
+ * @param title 
+ * @param headers
+ * @param columns
+ * @param title_color 
+ * @param header_colors 
+ * @param column_colors 
+ */
+inline void print_table_by_column(
+    const std::string& title, const std::vector<std::string> &headers,
+    const std::vector<std::vector<std::string>> &columns,
+    const std::string title_color = "",
+    const std::vector<std::string> &header_colors = {},
+    const std::vector<std::vector<std::string>> &column_colors = {}) {
+  if(columns.empty()) return;
+  auto widths = calc_col_widths_by_column(headers, columns);
+  size_t title_length = 1; // 首个 '+'
+  for (auto w : widths)
+    title_length += w + 3; // 每列内容+左右空格+分隔符
+  title_length = std::max(title_length, title.size() + 4);
+  print_title(title, title_length, title_color);
+  print_separator(widths);
+  print_row(headers, widths, header_colors); // 标题可加色
+  print_separator(widths);
+  print_all_column(columns, widths, column_colors);
+  print_separator(widths);
+}
+
 } // namespace terminal_table
+
 
 #endif
